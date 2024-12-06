@@ -24,6 +24,9 @@ pub trait ListWithDepth: ObjectStore {
         prefix: Option<&Path>,
         depth: usize,
     ) -> object_store::Result<ListResult> {
+        if depth == 0 {
+            return self.list_with_delimiter(prefix).await;
+        }
         Ok(ListResult {
             objects: vec![],
             common_prefixes: vec![],
@@ -48,17 +51,35 @@ mod tests {
         Ok(store)
     }
 
-    #[tokio::test]
-    async fn test_list_with_depth_0() -> object_store::Result<()> {
+    /// Returns (object_paths, common_prefixes).
+    async fn test_list_with_depth_n(depth: usize) -> object_store::Result<(Vec<Path>, Vec<Path>)> {
         let store = create_in_memory_store().await?;
-        let list_result = store.list_with_depth(None, 0).await?;
         let ListResult {
             objects,
             common_prefixes,
-        } = list_result;
-        assert_eq!(objects.len(), 1);
-        assert_eq!(objects[0].location, Path::from("a.txt"));
+        } = store.list_with_depth(None, depth).await?;
+        let object_paths = objects
+            .into_iter()
+            .map(|object_meta| object_meta.location)
+            .collect();
+        Ok((object_paths, common_prefixes))
+    }
+
+    #[tokio::test]
+    async fn test_list_with_depth_0() -> object_store::Result<()> {
+        let (object_paths, common_prefixes) = test_list_with_depth_n(0).await?;
+        assert_eq!(object_paths.len(), 1);
+        assert_eq!(object_paths[0], Path::from("a.txt"));
         assert_eq!(common_prefixes, vec![Path::from("foo")]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_with_depth_1() -> object_store::Result<()> {
+        let (object_paths, common_prefixes) = test_list_with_depth_n(1).await?;
+        assert_eq!(object_paths.len(), 1);
+        assert_eq!(object_paths[0], Path::from("b.txt"));
+        assert_eq!(common_prefixes, vec![Path::from("foo/bar")]);
         Ok(())
     }
 }
