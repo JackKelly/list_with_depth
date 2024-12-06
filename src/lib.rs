@@ -31,13 +31,19 @@ pub async fn list_with_depth(
     }
 
     for _d in 0..depth {
-        let mut common_prefixes_at_this_depth = vec![];
-        for common_prefix in list_result.common_prefixes.clone() {
-            common_prefixes_at_this_depth.push(tokio::spawn(list_with_delimiter_take_ownership(
-                store.clone(),
-                common_prefix,
-            )));
-        }
+        let list_result_handles_for_next_depth: Vec<_> = list_result
+            .common_prefixes
+            .clone()
+            .into_iter()
+            .map(|common_prefix| {
+                tokio::spawn(list_with_delimiter_take_ownership(
+                    store.clone(),
+                    common_prefix,
+                ))
+            })
+            .collect();
+
+        // Get the total number of
     }
 
     Ok(ListResult {
@@ -46,7 +52,8 @@ pub async fn list_with_depth(
     })
 }
 
-// Helper function
+// Helper function. This is required because the `Future` has to own `prefix` until `list_with_delimiter`
+// returns. Otherwise the ref to `prefix` could become a dangling reference.
 async fn list_with_delimiter_take_ownership(
     store: Arc<dyn ObjectStore>,
     prefix: Path,
