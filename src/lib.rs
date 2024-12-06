@@ -35,6 +35,8 @@ fn next_level(
     depth_of_list_result: usize,
     target_depth: usize,
 ) -> Pin<Box<dyn Future<Output = std::result::Result<ListResult, object_store::Error>> + Send>> {
+    // See here for why we're using `Box::pin`:
+    // https://stackoverflow.com/a/67030773
     Box::pin(async move {
         // Base case:
         if depth_of_list_result == target_depth {
