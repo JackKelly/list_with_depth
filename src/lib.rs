@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use tokio_stream::StreamExt;
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use object_store::{path::Path, ListResult, ObjectStore};
 
@@ -27,60 +26,68 @@ pub async fn list_with_depth(
     depth: usize,
 ) -> object_store::Result<ListResult> {
     let list_result = store.list_with_delimiter(prefix).await?;
-    // if depth == 0 {
-    //     return Ok(list_result);
-    // }
+    next_level(store, list_result, 0, depth).await
+}
 
-    const MAX_REQUESTS_IN_FLIGHT: usize = 256;
-    let (tx, mut rx) = tokio::sync::mpsc::channel(MAX_REQUESTS_IN_FLIGHT);
-    tx.send((list_result, 0)).await.expect("tx.send");
-    let mut handles = vec![];
-    let mut final_list_result = ListResult {
-        objects: vec![],
-        common_prefixes: vec![],
-    };
-
-    while let Some((list_result, depth_of_list_result)) = rx.recv().await {
-        println!("loop");
-        if depth_of_list_result == depth {
-            final_list_result.objects.extend(list_result.objects);
-            final_list_result
-                .common_prefixes
-                .extend(list_result.common_prefixes);
-            continue;
+fn next_level(
+    store: Arc<dyn ObjectStore>,
+    list_result: ListResult,
+    depth_of_list_result: usize,
+    target_depth: usize,
+) -> Pin<Box<dyn Future<Output = std::result::Result<ListResult, object_store::Error>> + Send>> {
+    Box::pin(async move {
+        // Base case:
+        if depth_of_list_result == target_depth {
+            return Ok(list_result);
         }
-        let new_handles: Vec<_> = list_result
+
+        let handles: Vec<_> = list_result
             .common_prefixes
             .clone()
             .into_iter()
-            .map(|common_prefix| {
-                let store = store.clone();
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    let next_level_list_res =
-                        list_with_delimiter_take_ownership(store, common_prefix)
-                            .await
-                            .expect("list_with_delimiter_take_ownership");
-                    tx.send((next_level_list_res, depth_of_list_result + 1))
+            .map(|common_prefix| async {
+                let store1 = store.clone();
+                let next_list_result = tokio::spawn(async move {
+                    list_with_delimiter_take_ownership(store1, common_prefix)
                         .await
-                        .expect("tx.send");
+                        .expect("list_with_delimiter_take_ownership")
                 })
+                .await
+                .expect("spawn list_with_delimiter_take_ownership");
+                // Recursive call to next_level here
+                let store2 = store.clone();
+                tokio::spawn(async move {
+                    next_level(
+                        store2,
+                        next_list_result,
+                        depth_of_list_result + 1,
+                        target_depth,
+                    )
+                    .await
+                })
+                .await
             })
             .collect();
-        handles.extend(new_handles);
-    }
 
-    println!("after while loop");
-    drop(tx);
-    for handle in handles {
-        handle.await.unwrap();
-    }
-
-    Ok(final_list_result)
+        // Extract results and handle errors
+        let mut final_list_result = ListResult {
+            objects: vec![],
+            common_prefixes: vec![],
+        };
+        for handle in handles {
+            let list_res = handle.await??;
+            final_list_result.objects.extend(list_res.objects);
+            final_list_result
+                .common_prefixes
+                .extend(list_res.common_prefixes);
+        }
+        Ok(final_list_result)
+    })
 }
 
-// Helper function. This is required because the `Future` has to own `prefix` until `list_with_delimiter`
-// returns. Otherwise the ref to `prefix` could become a dangling reference.
+// Helper function. This is required because the `Future` has to own `prefix`
+// until `list_with_delimiter` returns. Otherwise the ref to `prefix`
+// could become a dangling reference.
 async fn list_with_delimiter_take_ownership(
     store: Arc<dyn ObjectStore>,
     prefix: Path,
@@ -131,7 +138,7 @@ mod tests {
     async fn test_depth_1() -> object_store::Result<()> {
         let (object_paths, common_prefixes) = test_depth_n(1).await?;
         assert_eq!(object_paths.len(), 1);
-        assert_eq!(object_paths[0], Path::from("b.txt"));
+        assert_eq!(object_paths[0], Path::from("foo/b.txt"));
         assert_eq!(common_prefixes, vec![Path::from("foo/bar")]);
         Ok(())
     }
