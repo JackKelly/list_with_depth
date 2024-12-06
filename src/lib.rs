@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use tokio_stream::StreamExt;
 
 use object_store::{path::Path, ListResult, ObjectStore};
 
@@ -26,30 +27,56 @@ pub async fn list_with_depth(
     depth: usize,
 ) -> object_store::Result<ListResult> {
     let list_result = store.list_with_delimiter(prefix).await?;
-    if depth == 0 {
-        return Ok(list_result);
-    }
+    // if depth == 0 {
+    //     return Ok(list_result);
+    // }
 
-    for _d in 0..depth {
-        let list_result_handles_for_next_depth: Vec<_> = list_result
+    const MAX_REQUESTS_IN_FLIGHT: usize = 256;
+    let (tx, mut rx) = tokio::sync::mpsc::channel(MAX_REQUESTS_IN_FLIGHT);
+    tx.send((list_result, 0)).await.expect("tx.send");
+    let mut handles = vec![];
+    let mut final_list_result = ListResult {
+        objects: vec![],
+        common_prefixes: vec![],
+    };
+
+    while let Some((list_result, depth_of_list_result)) = rx.recv().await {
+        println!("loop");
+        if depth_of_list_result == depth {
+            final_list_result.objects.extend(list_result.objects);
+            final_list_result
+                .common_prefixes
+                .extend(list_result.common_prefixes);
+            continue;
+        }
+        let new_handles: Vec<_> = list_result
             .common_prefixes
             .clone()
             .into_iter()
             .map(|common_prefix| {
-                tokio::spawn(list_with_delimiter_take_ownership(
-                    store.clone(),
-                    common_prefix,
-                ))
+                let store = store.clone();
+                let tx = tx.clone();
+                tokio::spawn(async move {
+                    let next_level_list_res =
+                        list_with_delimiter_take_ownership(store, common_prefix)
+                            .await
+                            .expect("list_with_delimiter_take_ownership");
+                    tx.send((next_level_list_res, depth_of_list_result + 1))
+                        .await
+                        .expect("tx.send");
+                })
             })
             .collect();
-
-        // Get the total number of
+        handles.extend(new_handles);
     }
 
-    Ok(ListResult {
-        objects: vec![],
-        common_prefixes: vec![],
-    })
+    println!("after while loop");
+    drop(tx);
+    for handle in handles {
+        handle.await.unwrap();
+    }
+
+    Ok(final_list_result)
 }
 
 // Helper function. This is required because the `Future` has to own `prefix` until `list_with_delimiter`
