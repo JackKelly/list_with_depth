@@ -47,16 +47,13 @@ fn next_level(
             .into_iter()
             .map(|common_prefix| async {
                 let store1 = store.clone();
-                let next_list_result = tokio::spawn(async move {
-                    list_with_delimiter_take_ownership(store1, common_prefix)
-                        .await
-                        .expect("list_with_delimiter_take_ownership")
-                })
-                .await
-                .expect("spawn list_with_delimiter_take_ownership");
-                // Recursive call to next_level here
                 let store2 = store.clone();
                 tokio::spawn(async move {
+                    let next_list_result =
+                        list_with_delimiter_take_ownership(store1, common_prefix)
+                            .await
+                            .expect("list_with_delimiter_take_ownership");
+                    // Recursive call to next_level:
                     next_level(
                         store2,
                         next_list_result,
