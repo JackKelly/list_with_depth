@@ -48,7 +48,6 @@ fn next_level(
 
         list_result
             .common_prefixes
-            .clone()
             .into_iter()
             .for_each(|common_prefix| {
                 let store1 = store.clone();
