@@ -45,29 +45,23 @@ fn next_level(
         }
 
         let mut set = JoinSet::new();
+        for common_prefix in list_result.common_prefixes {
+            let inner_store = store.clone();
+            set.spawn(async move {
+                let next_list_result = inner_store
+                    .list_with_delimiter(Some(&common_prefix))
+                    .await?;
 
-        list_result
-            .common_prefixes
-            .into_iter()
-            .for_each(|common_prefix| {
-                let store1 = store.clone();
-                let store2 = store.clone();
-                set.spawn(async move {
-                    let next_list_result = store1
-                        .list_with_delimiter(Some(&common_prefix))
-                        .await
-                        .expect("list_with_delimiter_take_ownership");
-
-                    // Recursive call to next_level:
-                    next_level(
-                        store2,
-                        next_list_result,
-                        depth_of_list_result + 1,
-                        target_depth,
-                    )
-                    .await
-                });
+                // Recursive call to next_level:
+                next_level(
+                    inner_store,
+                    next_list_result,
+                    depth_of_list_result + 1,
+                    target_depth,
+                )
+                .await
             });
+        }
 
         // Extract results and propagate errors:
         let mut combined = ListResult {
