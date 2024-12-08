@@ -53,10 +53,11 @@ fn next_level(
                 let store1 = store.clone();
                 let store2 = store.clone();
                 set.spawn(async move {
-                    let next_list_result =
-                        list_with_delimiter_take_ownership(store1, common_prefix)
-                            .await
-                            .expect("list_with_delimiter_take_ownership");
+                    let next_list_result = store1
+                        .list_with_delimiter(Some(&common_prefix))
+                        .await
+                        .expect("list_with_delimiter_take_ownership");
+
                     // Recursive call to next_level:
                     next_level(
                         store2,
@@ -80,16 +81,6 @@ fn next_level(
         }
         Ok(combined)
     })
-}
-
-// Helper function. This is required because the `Future` has to own `prefix`
-// until `list_with_delimiter` returns. Otherwise the ref to `prefix`
-// could become a dangling reference.
-async fn list_with_delimiter_take_ownership(
-    store: Arc<dyn ObjectStore>,
-    prefix: Path,
-) -> object_store::Result<ListResult> {
-    store.list_with_delimiter(Some(&prefix)).await
 }
 
 #[cfg(test)]
