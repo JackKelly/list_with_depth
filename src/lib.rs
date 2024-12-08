@@ -1,6 +1,7 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use object_store::{path::Path, ListResult, ObjectStore};
+use tokio::task::JoinSet;
 
 /// List objects with the given prefix and depth, and an implementation specific delimiter.
 /// Returns common prefixes (directories) in addition to object metadata.
@@ -43,14 +44,16 @@ fn next_level(
             return Ok(list_result);
         }
 
-        let handles: Vec<_> = list_result
+        let mut set = JoinSet::new();
+
+        list_result
             .common_prefixes
             .clone()
             .into_iter()
-            .map(|common_prefix| {
+            .for_each(|common_prefix| {
                 let store1 = store.clone();
                 let store2 = store.clone();
-                tokio::spawn(async move {
+                set.spawn(async move {
                     let next_list_result =
                         list_with_delimiter_take_ownership(store1, common_prefix)
                             .await
@@ -63,23 +66,20 @@ fn next_level(
                         target_depth,
                     )
                     .await
-                })
-            })
-            .collect();
+                });
+            });
 
         // Extract results and propagate errors:
-        let mut final_list_result = ListResult {
+        let mut combined = ListResult {
             objects: vec![],
             common_prefixes: vec![],
         };
-        for handle in handles {
-            let list_res = handle.await??;
-            final_list_result.objects.extend(list_res.objects);
-            final_list_result
-                .common_prefixes
-                .extend(list_res.common_prefixes);
+        while let Some(handle) = set.join_next().await {
+            let list_res = handle??;
+            combined.objects.extend(list_res.objects);
+            combined.common_prefixes.extend(list_res.common_prefixes);
         }
-        Ok(final_list_result)
+        Ok(combined)
     })
 }
 
