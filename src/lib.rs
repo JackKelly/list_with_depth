@@ -100,7 +100,14 @@ mod tests {
     use super::*;
 
     async fn create_in_memory_store() -> object_store::Result<InMemory> {
-        const KEYS: [&str; 4] = ["a.txt", "foo/b.txt", "foo/bar/c.txt", "foo/bar/d.txt"];
+        const KEYS: [&str; 6] = [
+            "a.txt",
+            "foo/b.txt",
+            "foo/bar/c.txt",
+            "foo/bar/d.txt",
+            "foo/baz/e.txt",
+            "foo/baz/bleh/f.txt",
+        ];
         let store = InMemory::new();
         for key in KEYS {
             store.put(&key.into(), PutPayload::new()).await?;
@@ -137,7 +144,21 @@ mod tests {
         let (object_paths, common_prefixes) = test_depth_n(1).await?;
         assert_eq!(object_paths.len(), 1);
         assert_eq!(object_paths[0], Path::from("foo/b.txt"));
-        assert_eq!(common_prefixes, vec![Path::from("foo/bar")]);
+        assert_eq!(
+            common_prefixes,
+            vec![Path::from("foo/bar"), Path::from("foo/baz")]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_depth_2() -> object_store::Result<()> {
+        let (object_paths, common_prefixes) = test_depth_n(2).await?;
+        assert_eq!(object_paths.len(), 3);
+        assert_eq!(object_paths[0], Path::from("foo/bar/c.txt"));
+        assert_eq!(object_paths[1], Path::from("foo/bar/d.txt"));
+        assert_eq!(object_paths[2], Path::from("foo/baz/e.txt"));
+        assert_eq!(common_prefixes, vec![Path::from("foo/baz/bleh")]);
         Ok(())
     }
 }
