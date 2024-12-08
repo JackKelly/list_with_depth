@@ -47,7 +47,7 @@ fn next_level(
             .common_prefixes
             .clone()
             .into_iter()
-            .map(|common_prefix| async {
+            .map(|common_prefix| {
                 let store1 = store.clone();
                 let store2 = store.clone();
                 tokio::spawn(async move {
@@ -64,12 +64,10 @@ fn next_level(
                     )
                     .await
                 })
-                .await // TODO: I think this await means that we don't submit multiple
-                       // list_with_deliter calls in parallel? Need to remove this?
             })
             .collect();
 
-        // Extract results and handle errors
+        // Extract results and propagate errors:
         let mut final_list_result = ListResult {
             objects: vec![],
             common_prefixes: vec![],
