@@ -64,7 +64,8 @@ fn next_level(
                     )
                     .await
                 })
-                .await
+                .await // TODO: I think this await means that we don't submit multiple
+                       // list_with_deliter calls in parallel? Need to remove this?
             })
             .collect();
 
