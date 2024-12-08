@@ -12,15 +12,15 @@ use tokio::task::JoinSet;
 /// - `foo/bar/c.txt`
 /// - `foo/bar/d.txt`
 ///
-/// Calling `list_with_depth` with `prefix = None` and `depth = 0` is equivalent to calling
-/// `ObjectStore::list_with_delimiter(None)`. It will return the objects and common prefixes at
-/// the root: `a.txt` and `foo/`.
+/// Calling `list_with_depth` with `depth = 0` is equivalent to calling
+/// `ObjectStore::list_with_delimiter`: It will return the objects and common
+/// prefixes at the root: `objects="a.txt"` and `common_prefixes="foo"`.
 ///
-/// Calling `list_with_depth` with `depth = 1` will recurse once, and return `b.txt` and
-/// `foo/bar/`.
+/// Calling `list_with_depth` with `depth = 1` will recurse once, and return
+/// `objects="foo/b.txt"` and `common_prefixes="foo/bar"`.
 ///
-/// Prefixes are evaluated on a path segment basis, i.e. `foo/bar` is a prefix of `foo/bar/x`
-/// but not of `foo/bar_baz/x`.
+/// Prefixes are evaluated on a path segment basis, i.e. `foo/bar` is a
+/// prefix of `foo/bar/x` but not of `foo/bar_baz/x`.
 pub async fn list_with_depth(
     store: Arc<dyn ObjectStore>,
     prefix: Option<&Path>,
