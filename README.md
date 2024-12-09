@@ -1,4 +1,5 @@
-List objects with the given prefix and depth, and an implementation specific delimiter.
+List objects from [`object_store`] with the given prefix and depth, 
+and an implementation specific delimiter.
 Returns common prefixes (directories) in addition to object metadata.
 
 For example, say that a bucket contains the following objects:
