@@ -1,7 +1,7 @@
 [package]
 name = "list_with_depth"
 description = "List objects from object_store with the given prefix and depth."
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/JackKelly/list_with_depth"
