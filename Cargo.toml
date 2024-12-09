@@ -13,4 +13,4 @@ keywords = ["object", "storage", "cloud"]
 
 [dependencies]
 object_store = "0.11"
-tokio = "1.42"
+tokio = { version = "1.42", features = ["macros"] }
