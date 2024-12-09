@@ -2,8 +2,14 @@
 name = "list_with_depth"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+homepage = "https://github.com/JackKelly/list_with_depth"
+repository = "https://github.com/JackKelly/list_with_depth"
+readme = "README.md"
+authors = ["Jack Kelly <jack@openclimatefix.org>"]
+categories = ["filesystem"]
+keywords = ["object", "storage", "cloud"]
 
 [dependencies]
-object_store = "0.11.1"
-tokio = "1.42.0"
-tokio-stream = "0.1.17"
+object_store = "0.11"
+tokio = "1.42"

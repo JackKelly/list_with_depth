@@ -1,37 +1,21 @@
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use object_store::{path::Path, ListResult, ObjectStore};
 use tokio::task::JoinSet;
 
-/// List objects with the given prefix and depth, and an implementation specific delimiter.
-/// Returns common prefixes (directories) in addition to object metadata.
-///
-/// For example, say that a bucket contains the following objects:
-/// - `a.txt`
-/// - `foo/b.txt`
-/// - `foo/bar/c.txt`
-/// - `foo/bar/d.txt`
-///
-/// Calling `list_with_depth` with `depth = 0` is equivalent to calling
-/// `ObjectStore::list_with_delimiter`: It will return the objects and common
-/// prefixes at the root: `objects="a.txt"` and `common_prefixes="foo"`.
-///
-/// Calling `list_with_depth` with `depth = 1` will recurse once, and return
-/// `objects="foo/b.txt"` and `common_prefixes="foo/bar"`.
-///
-/// Prefixes are evaluated on a path segment basis, i.e. `foo/bar` is a
-/// prefix of `foo/bar/x` but not of `foo/bar_baz/x`.
+#[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 pub async fn list_with_depth(
-    store: Arc<dyn ObjectStore>,
+    store: &Arc<impl ObjectStore>,
     prefix: Option<&Path>,
     depth: usize,
 ) -> object_store::Result<ListResult> {
     let list_result = store.list_with_delimiter(prefix).await?;
-    next_level(store, list_result, 0, depth).await
+    next_level(store.clone(), list_result, 0, depth).await
 }
 
 fn next_level(
-    store: Arc<dyn ObjectStore>,
+    store: Arc<impl ObjectStore>,
     list_result: ListResult,
     depth_of_list_result: usize,
     target_depth: usize,
@@ -106,7 +90,7 @@ mod tests {
         let ListResult {
             objects,
             common_prefixes,
-        } = list_with_depth(store, None, depth).await?;
+        } = list_with_depth(&store, None, depth).await?;
         let object_paths = objects
             .into_iter()
             .map(|object_meta| object_meta.location)
