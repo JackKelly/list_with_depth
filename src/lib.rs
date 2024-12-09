@@ -6,16 +6,16 @@ use tokio::task::JoinSet;
 
 #[doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 pub async fn list_with_depth(
-    store: &Arc<impl ObjectStore>,
+    store: Arc<dyn ObjectStore>,
     prefix: Option<&Path>,
     depth: usize,
 ) -> object_store::Result<ListResult> {
     let list_result = store.list_with_delimiter(prefix).await?;
-    next_level(store.clone(), list_result, 0, depth).await
+    next_level(store, list_result, 0, depth).await
 }
 
 fn next_level(
-    store: Arc<impl ObjectStore>,
+    store: Arc<dyn ObjectStore>,
     list_result: ListResult,
     depth_of_list_result: usize,
     target_depth: usize,
@@ -90,7 +90,7 @@ mod tests {
         let ListResult {
             objects,
             common_prefixes,
-        } = list_with_depth(&store, None, depth).await?;
+        } = list_with_depth(store, None, depth).await?;
         let object_paths = objects
             .into_iter()
             .map(|object_meta| object_meta.location)

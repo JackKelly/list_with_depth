@@ -49,14 +49,20 @@ async fn main() -> object_store::Result<()> {
     // Call `list_with_depth` with `depth = 0`:
     let depth = 0;
     let prefix = None;
-    let ListResult{objects, common_prefixes} = list_with_depth(&store, prefix, depth).await?;
+    let ListResult{
+        objects, 
+        common_prefixes
+    } = list_with_depth(store.clone(), prefix, depth).await?;
     assert_eq!(objects[0].location, Path::from("a.txt"));
     assert_eq!(common_prefixes, vec![Path::from("foo")]);
 
     // Call `list_with_depth` with `depth = 1`:
     let depth = 1;
     let prefix = None;
-    let ListResult{objects, common_prefixes} = list_with_depth(&store, prefix, depth).await?;
+    let ListResult{
+        objects, 
+        common_prefixes
+    } = list_with_depth(store.clone(), prefix, depth).await?;
     assert_eq!(objects[0].location, Path::from("foo/b.txt"));
     assert_eq!(common_prefixes, vec![Path::from("foo/bar")]);
 
