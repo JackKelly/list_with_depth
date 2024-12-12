@@ -69,3 +69,39 @@ async fn main() -> object_store::Result<()> {
     Ok(())
 }
 ```
+
+# Performance tweak when you're listing hundreds (or more) prefixes
+
+Let's say you call `list_with_depth(store, None, 1)` on a bucket with hundreds
+of prefixes one level right of the root, like this:
+
+```
+/foo/000/
+/foo/001/
+/foo/002/
+...
+/foo/999/
+```
+
+This will cause `object_store` to submit hundreds of GET requests to object storage.
+
+Most network IO in Tokio is non-blocking. One notable exception is DNS resolution.
+By default, `reqwest` uses a _blocking_ DNS resolver (without a DNS cache). So, every
+time `object_store` submits a GET request, it also calls the default DNS resolver,
+which causes Tokio to launch a blocking thread (which is a true "heavyweight" 
+operating system thread). It is surprisingly expensive to launch (and shut down)
+hundreds of operating system threads. For example, it can take multiple seconds
+to shutdown all those threads.
+
+One work-around is to tell `reqwest` to use `hickory-dns` which provides an async DNS resolver
+and a DNS cache. Note that `list_with_depth` doesn't use `reqwest` directly.
+Instead, `list_with_depth` uses `object_store`, which in turn uses `reqwest`.
+
+To enable `hickory-dns`, add this line to the `[dependencies]` section
+in your crate's `Cargo.toml`:
+
+`reqwest = { version = "<LATEST VERSION>", features = ["hickory-dns"] }`
+
+For more info, see [this Reddit discussion](https://www.reddit.com/r/rust/comments/1hbyqcw).
+
+Note that `hickory-dns` doesn't work on all the platforms that the default DNS resolver works on.
